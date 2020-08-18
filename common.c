@@ -3,8 +3,44 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <getopt.h>
 
 #include "common.h"
+
+static struct option long_options[] = {
+  /* name, has_arg, flag, val */
+  {"input", 1, NULL, 'i'},
+  {"size", 1, NULL, 's'},
+  {"verify", 0, NULL, 'v'},
+  {0,0,0,0}
+};
+
+void handle_arguments(int argc, char * argv[], int * matrix_dim, const char *input_file){
+  int opt, option_index=0;
+
+  while ((opt = getopt_long(argc, argv, "::vs:i:", 
+                            long_options, &option_index)) != -1 ) {
+    switch(opt){
+    case 'i':
+      input_file = optarg;
+      break;
+    case 's':
+      *matrix_dim = atoi(optarg);
+      printf("Generate input matrix internally, size =%d\n", *matrix_dim);
+      break;
+    case '?':
+      fprintf(stderr, "invalid option\n");
+      break;
+    case ':':
+      fprintf(stderr, "missing argument\n");
+      break;
+    default:
+      fprintf(stderr, "Usage: %s [-v] [-s matrix_size|-i input_file]\n",
+	      argv[0]);
+      exit(EXIT_FAILURE);
+    }
+  }
+}
 
 void stopwatch_start(stopwatch *sw){
     if (sw == NULL)
@@ -38,9 +74,9 @@ get_interval_by_usec(stopwatch *sw){
 }
 
 func_ret_t 
-create_matrix_from_file(float **mp, const char* filename, int *size_p){
+create_matrix_from_file(DATATYPE **mp, const char* filename, int *size_p){
   int i, j, size;
-  float *m;
+  DATATYPE *m;
   FILE *fp = NULL;
 
   fp = fopen(filename, "rb");
@@ -50,7 +86,7 @@ create_matrix_from_file(float **mp, const char* filename, int *size_p){
 
   fscanf(fp, "%d\n", &size);
 
-  m = (float*) malloc(sizeof(float)*size*size);
+  m = (DATATYPE*) malloc(sizeof(DATATYPE)*size*size);
   if ( m == NULL) {
       fclose(fp);
       return RET_FAILURE;
@@ -72,17 +108,17 @@ create_matrix_from_file(float **mp, const char* filename, int *size_p){
 
 
 func_ret_t
-create_matrix_from_random(float **mp, int size){
-  float *l, *u, *m;
+create_matrix_from_random(DATATYPE **mp, int size){
+  DATATYPE *l, *u, *m;
   int i,j,k;
 
   srand(time(NULL));
 
-  l = (float*)malloc(size*size*sizeof(float));
+  l = (DATATYPE*)malloc(size*size*sizeof(DATATYPE));
   if ( l == NULL)
     return RET_FAILURE;
 
-  u = (float*)malloc(size*size*sizeof(float));
+  u = (DATATYPE*)malloc(size*size*sizeof(DATATYPE));
   if ( u == NULL) {
       free(l);
       return RET_FAILURE;
@@ -126,7 +162,7 @@ create_matrix_from_random(float **mp, int size){
 }
 
 void
-matrix_multiply(float *inputa, float *inputb, float *output, int size){
+matrix_multiply(DATATYPE *inputa, DATATYPE *inputb, DATATYPE *output, int size){
   int i, j, k;
 
   for (i=0; i < size; i++)
@@ -137,14 +173,14 @@ matrix_multiply(float *inputa, float *inputb, float *output, int size){
 }
 
 func_ret_t
-lud_verify(float *m, float *lu, int matrix_dim){
+lud_verify(DATATYPE *m, DATATYPE *lu, int matrix_dim){
   int i,j,k;
-  float *tmp = (float*)malloc(matrix_dim*matrix_dim*sizeof(float));
+  DATATYPE *tmp = (DATATYPE*)malloc(matrix_dim*matrix_dim*sizeof(DATATYPE));
 
   for (i=0; i < matrix_dim; i ++)
     for (j=0; j< matrix_dim; j++) {
-        float sum = 0;
-        float l,u;
+        DATATYPE sum = 0;
+        DATATYPE l,u;
         for (k=0; k <= MIN(i,j); k++){
             if ( i==k)
               l=1;
@@ -187,15 +223,15 @@ lud_verify(float *m, float *lu, int matrix_dim){
 }
 
 void
-matrix_duplicate(float *src, float **dst, int matrix_dim) {
-    int s = matrix_dim*matrix_dim*sizeof(float);
-   float *p = (float *) malloc (s);
+matrix_duplicate(DATATYPE *src, DATATYPE **dst, int matrix_dim) {
+    int s = matrix_dim*matrix_dim*sizeof(DATATYPE);
+   DATATYPE *p = (DATATYPE *) malloc (s);
    memcpy(p, src, s);
    *dst = p;
 }
 
 void
-print_matrix(float *m, int matrix_dim) {
+print_matrix(DATATYPE *m, int matrix_dim) {
     int i, j;
     for (i=0; i<matrix_dim;i++) {
       for (j=0; j<matrix_dim;j++)
@@ -208,12 +244,12 @@ print_matrix(float *m, int matrix_dim) {
 // Generate well-conditioned matrix internally  by Ke Wang 2013/08/07 22:20:06
 
 func_ret_t
-create_matrix(float **mp, int size){
-  float *m;
+create_matrix(DATATYPE **mp, int size){
+  DATATYPE *m;
   int i,j;
-  float lamda = -0.001;
-  float coe[2*size-1];
-  float coe_i =0.0;
+  DATATYPE lamda = -0.001;
+  DATATYPE coe[2*size-1];
+  DATATYPE coe_i =0.0;
 
   for (i=0; i < size; i++)
     {
@@ -224,7 +260,7 @@ create_matrix(float **mp, int size){
       coe[j]=coe_i;
     }
 
-  m = (float*) malloc(sizeof(float)*size*size);
+  m = (DATATYPE*) malloc(sizeof(DATATYPE)*size*size);
   if ( m == NULL) {
       return RET_FAILURE;
   }

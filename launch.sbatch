@@ -9,4 +9,4 @@ module load esslurm cuda
 srcdir=/global/homes/h/hbrunie/benchmarks/CuSolver
 #Move to srcdir to be able to use relative path
 cd $srcdir
-srun -n 1 -c 10 ./getrf
+srun -n 1 -c 10 ./getrf -s 5

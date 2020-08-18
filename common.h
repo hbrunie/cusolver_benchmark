@@ -8,10 +8,10 @@
 extern "C" {
 #endif
 
+#define DATATYPE double
 
-
-#define GET_RAND_FP ( (float)rand() /   \
-                     ((float)(RAND_MAX)+(float)(1)) )
+#define GET_RAND_FP ( (DATATYPE)rand() /   \
+                     ((DATATYPE)(RAND_MAX)+(DATATYPE)(1)) )
 
 #define MIN(i,j) ((i)<(j) ? (i) : (j))
 
@@ -38,25 +38,28 @@ int
 get_interval_by_usec(stopwatch *sw);
 
 func_ret_t
-create_matrix_from_file(float **mp, const char *filename, int *size_p);
+create_matrix_from_file(DATATYPE **mp, const char *filename, int *size_p);
 
 func_ret_t
-create_matrix_from_random(float **mp, int size);
+create_matrix_from_random(DATATYPE **mp, int size);
 
 func_ret_t
-create_matrix(float **mp, int size);
+create_matrix(DATATYPE **mp, int size);
 
 func_ret_t
-lud_verify(float *m, float *lu, int size);
+lud_verify(DATATYPE *m, DATATYPE *lu, int size);
 
 void
-matrix_multiply(float *inputa, float *inputb, float *output, int size);
+matrix_multiply(DATATYPE *inputa, DATATYPE *inputb, DATATYPE *output, int size);
 
 void
-matrix_duplicate(float *src, float **dst, int matrix_dim);
+matrix_duplicate(DATATYPE *src, DATATYPE **dst, int matrix_dim);
 
 void
-print_matrix(float *mm, int matrix_dim);
+print_matrix(DATATYPE *mm, int matrix_dim);
+
+void
+handle_arguments(int argc, char * argv[], int * matrix_dim, const char *input_file);
 
 #ifdef __cplusplus
 }

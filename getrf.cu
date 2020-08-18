@@ -24,11 +24,6 @@ void printMatrix(int m, int n, const double*A, int lda, const char* name)
     }
 }
 
-int create_matrix(){
-
-
-}
-
 double * generate_rhs(const int size){
     double * m = (double*) malloc(sizeof(double)*size);
     return m;
@@ -54,7 +49,6 @@ int main(int argc, char*argv[])
     const int lda = m;
     const int ldb = m;
     const int size = lda*m;
-    double *A;
     double *B = generate_rhs(size);
     double X[m]; /* X = A\B */
     double LU[lda*m]; /* L and U */
@@ -68,21 +62,26 @@ int main(int argc, char*argv[])
     int  lwork = 0;     /* size of workspace */
     double *d_work = NULL; /* device workspace for getrf */
 
+    double *A;
+    int matrix_dim = 0;
+    const char *input_file = NULL;
+    handle_arguments(argc, argv, &matrix_dim, input_file);
     //Creating matrix A
+    func_ret_t ret;
     if (input_file) {
         printf("Reading matrix from file %s\n", input_file);
-        ret = create_matrix_from_file(&m, input_file, &matrix_dim);
+        ret = create_matrix_from_file(&A, input_file, &matrix_dim);
         if (ret != RET_SUCCESS) {
-            m = NULL;
+            A = NULL;
             fprintf(stderr, "error create matrix from file %s\n", input_file);
             exit(EXIT_FAILURE);
         }
     }
     else if (matrix_dim) {
         printf("Creating matrix internally size=%d\n", matrix_dim);
-        ret = create_matrix(&m, matrix_dim);
+        ret = create_matrix(&A, matrix_dim);
         if (ret != RET_SUCCESS) {
-            m = NULL;
+            A = NULL;
             fprintf(stderr, "error create matrix internally size=%d\n", matrix_dim);
             exit(EXIT_FAILURE);
         }
