@@ -24,17 +24,6 @@ void printMatrix(int m, int n, const double*A, int lda, const char* name)
     }
 }
 
-double * generate_rhs(const int size){
-    double * m = (double*) malloc(sizeof(double)*size);
-    return m;
-}
-
-
-double * generate_squared_matrix(const int size){
-    double * m = (double*) malloc(sizeof(double)*size*size);
-    return m;
-}
-
 int main(int argc, char*argv[])
 {
     cusolverDnHandle_t cusolverH = NULL;
@@ -45,14 +34,6 @@ int main(int argc, char*argv[])
     cudaError_t cudaStat2 = cudaSuccess;
     cudaError_t cudaStat3 = cudaSuccess;
     cudaError_t cudaStat4 = cudaSuccess;
-    const int m = 3;
-    const int lda = m;
-    const int ldb = m;
-    const int size = lda*m;
-    double *B = generate_rhs(size);
-    double X[m]; /* X = A\B */
-    double LU[lda*m]; /* L and U */
-    int Ipiv[m];      /* host copy of pivoting sequence */
     int info = 0;     /* host copy of error info */
 
     double *d_A = NULL; /* device copy of A */
@@ -62,10 +43,12 @@ int main(int argc, char*argv[])
     int  lwork = 0;     /* size of workspace */
     double *d_work = NULL; /* device workspace for getrf */
 
-    double *A;
+    double *A,*B;
     int matrix_dim = 0;
+    int rhs_matrix_dim = 0;
+    const char *rhs_input_file = NULL;
     const char *input_file = NULL;
-    handle_arguments(argc, argv, &matrix_dim, input_file);
+    handle_arguments(argc, argv, &matrix_dim, input_file, &rhs_matrix_dim, rhs_input_file);
     //Creating matrix A
     func_ret_t ret;
     if (input_file) {
@@ -79,7 +62,7 @@ int main(int argc, char*argv[])
     }
     else if (matrix_dim) {
         printf("Creating matrix internally size=%d\n", matrix_dim);
-        ret = create_matrix(&A, matrix_dim);
+        ret = create_matrix_from_random(&A, matrix_dim);
         if (ret != RET_SUCCESS) {
             A = NULL;
             fprintf(stderr, "error create matrix internally size=%d\n", matrix_dim);
@@ -91,16 +74,45 @@ int main(int argc, char*argv[])
         exit(EXIT_FAILURE);
     }
 
+    if (rhs_input_file) {
+        ret = create_rhs_matrix_from_file(&B, rhs_input_file, &rhs_matrix_dim);
+        if (ret != RET_SUCCESS) {
+            B = NULL;
+            fprintf(stderr, "error create matrix from file %s\n", rhs_input_file);
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (rhs_matrix_dim) {
+        printf("Creating RHS matrix internally size=%d\n", rhs_matrix_dim);
+        ret = create_rhs_matrix_from_random(&B, rhs_matrix_dim);
+        if (ret != RET_SUCCESS) {
+            B = NULL;
+            fprintf(stderr, "error create matrix internally size=%d\n", rhs_matrix_dim);
+            exit(EXIT_FAILURE);
+        }
+    }
+    else {
+        printf("No input file specified!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    const int size = matrix_dim*matrix_dim;
+    const int lda = matrix_dim;
+    const int ldb = matrix_dim;
+    double X[matrix_dim]; /* X = A\B */
+    double LU[lda*matrix_dim]; /* L and U */
+    int Ipiv[matrix_dim];      /* host copy of pivoting sequence */
+
     const bool pivot_on = true;
     check_pivot(pivot_on);
 
 
     printf("A = (matlab base-1)\n");
-    printMatrix(m, m, A, lda, "A");
+    printMatrix(matrix_dim, matrix_dim, A, lda, "A");
     printf("=====\n");
 
     printf("B = (matlab base-1)\n");
-    printMatrix(m, 1, B, ldb, "B");
+    printMatrix(matrix_dim, 1, B, ldb, "B");
     printf("=====\n");
 
     /* step 1: create cusolver handle, bind a stream */
@@ -114,8 +126,8 @@ int main(int argc, char*argv[])
     assert(CUSOLVER_STATUS_SUCCESS == status);
 
     /* step 2: copy A to device */
-    cudaStat1 = cudaMalloc ((void**)&d_A, sizeof(double) * size);
-    cudaStat2 = cudaMalloc ((void**)&d_B, sizeof(double) * m);
+    cudaStat1 = cudaMalloc ((void**)&d_A, sizeof(double) * matrix_dim *matrix_dim );
+    cudaStat2 = cudaMalloc ((void**)&d_B, sizeof(double) * matrix_dim);
     cudaStat4 = cudaMalloc ((void**)&d_info, sizeof(int));
     assert(cudaSuccess == cudaStat1);
     assert(cudaSuccess == cudaStat2);
@@ -123,15 +135,15 @@ int main(int argc, char*argv[])
     assert(cudaSuccess == cudaStat4);
 
     cudaStat1 = cudaMemcpy(d_A, A, sizeof(double)*size, cudaMemcpyHostToDevice);
-    cudaStat2 = cudaMemcpy(d_B, B, sizeof(double)*m, cudaMemcpyHostToDevice);
+    cudaStat2 = cudaMemcpy(d_B, B, sizeof(double)*matrix_dim, cudaMemcpyHostToDevice);
     assert(cudaSuccess == cudaStat1);
     assert(cudaSuccess == cudaStat2);
 
     /* step 3: query working space of getrf */
     status = cusolverDnDgetrf_bufferSize(
             cusolverH,
-            m,
-            m,
+            matrix_dim,
+            matrix_dim,
             d_A,
             lda,
             &lwork);
@@ -144,14 +156,14 @@ int main(int argc, char*argv[])
     if (!pivot_on){
         d_Ipiv = NULL;
     }else{
-        cudaStat2 = cudaMalloc ((void**)&d_Ipiv, sizeof(int) * m);
+        cudaStat2 = cudaMalloc ((void**)&d_Ipiv, sizeof(int) * matrix_dim);
         assert(cudaSuccess == cudaStat2);
     }
 
     status = cusolverDnDgetrf(
             cusolverH,
-            m,
-            m,
+            matrix_dim,
+            matrix_dim,
             d_A,
             lda,
             d_work,
@@ -162,10 +174,10 @@ int main(int argc, char*argv[])
     assert(cudaSuccess == cudaStat1);
 
     if (pivot_on)
-        cudaStat1 = cudaMemcpy(Ipiv , d_Ipiv, sizeof(int)*m,
+        cudaStat1 = cudaMemcpy(Ipiv , d_Ipiv, sizeof(int)*matrix_dim,
                 cudaMemcpyDeviceToHost);
 
-    cudaStat2 = cudaMemcpy(LU, d_A, sizeof(double)*lda*m,
+    cudaStat2 = cudaMemcpy(LU, d_A, sizeof(double)*lda*matrix_dim,
             cudaMemcpyDeviceToHost);
     cudaStat3 = cudaMemcpy(&info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
     assert(cudaSuccess == cudaStat1);
@@ -178,18 +190,18 @@ int main(int argc, char*argv[])
     }
     if (pivot_on){
         printf("pivoting sequence, matlab base-1\n");
-        for(int j = 0 ; j < m ; j++){
+        for(int j = 0 ; j < matrix_dim ; j++){
             printf("Ipiv(%d) = %d\n", j+1, Ipiv[j]);
         }
     }
     printf("L and U = (matlab base-1)\n");
-    printMatrix(m, m, LU, lda, "LU");
+    printMatrix(matrix_dim, matrix_dim, LU, lda, "LU");
     printf("=====\n");
 
     status = cusolverDnDgetrs(
             cusolverH,
             CUBLAS_OP_N,
-            m,
+            matrix_dim,
             1, /* nrhs */
             d_A,
             lda,
@@ -202,11 +214,11 @@ int main(int argc, char*argv[])
     assert(CUSOLVER_STATUS_SUCCESS == status);
     assert(cudaSuccess == cudaStat1);
 
-    cudaStat1 = cudaMemcpy(X , d_B, sizeof(double)*m, cudaMemcpyDeviceToHost);
+    cudaStat1 = cudaMemcpy(X , d_B, sizeof(double)*matrix_dim, cudaMemcpyDeviceToHost);
     assert(cudaSuccess == cudaStat1);
 
     printf("X = (matlab base-1)\n");
-    printMatrix(m, 1, X, ldb, "X");
+    printMatrix(matrix_dim, 1, X, ldb, "X");
     printf("=====\n");
 
     /* free resources */

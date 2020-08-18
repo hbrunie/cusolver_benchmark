@@ -15,7 +15,7 @@ static struct option long_options[] = {
   {0,0,0,0}
 };
 
-void handle_arguments(int argc, char * argv[], int * matrix_dim, const char *input_file){
+void handle_arguments(int argc, char * argv[], int * matrix_dim, const char *input_file, int * rhs_matrix_dim, const char * rhs_input_file){
   int opt, option_index=0;
 
   while ((opt = getopt_long(argc, argv, "::vs:i:", 
@@ -24,8 +24,12 @@ void handle_arguments(int argc, char * argv[], int * matrix_dim, const char *inp
     case 'i':
       input_file = optarg;
       break;
+    case 'r':
+      rhs_input_file = optarg;
+      break;
     case 's':
       *matrix_dim = atoi(optarg);
+      *rhs_matrix_dim = atoi(optarg);
       printf("Generate input matrix internally, size =%d\n", *matrix_dim);
       break;
     case '?':
@@ -74,6 +78,36 @@ get_interval_by_usec(stopwatch *sw){
 }
 
 func_ret_t 
+create_rhs_matrix_from_file(DATATYPE **mp, const char* filename, int *size_p){
+  int i, j, size;
+  DATATYPE *m;
+  FILE *fp = NULL;
+
+  fp = fopen(filename, "rb");
+  if ( fp == NULL) {
+      return RET_FAILURE;
+  }
+
+  fscanf(fp, "%d\n", &size);
+
+  m = (DATATYPE*) malloc(sizeof(DATATYPE)*size*1);
+  if ( m == NULL) {
+      fclose(fp);
+      return RET_FAILURE;
+  }
+  for (i=0; i < size; i++) {
+      fscanf(fp, "%f ", m+i);
+  }
+
+  fclose(fp);
+
+  *size_p = size;
+  *mp = m;
+
+  return RET_SUCCESS;
+}
+
+func_ret_t 
 create_matrix_from_file(DATATYPE **mp, const char* filename, int *size_p){
   int i, j, size;
   DATATYPE *m;
@@ -106,6 +140,18 @@ create_matrix_from_file(DATATYPE **mp, const char* filename, int *size_p){
   return RET_SUCCESS;
 }
 
+func_ret_t
+create_rhs_matrix_from_random(DATATYPE **mp, int size){
+  DATATYPE *m;
+
+  m = (DATATYPE*) malloc(sizeof(DATATYPE)*size);
+  srand(time(NULL));
+  for (int i = 0; i < size; i++)
+      m[i] = GET_RAND_FP;
+
+  *mp = m;
+  return RET_SUCCESS;
+}
 
 func_ret_t
 create_matrix_from_random(DATATYPE **mp, int size){
@@ -113,6 +159,10 @@ create_matrix_from_random(DATATYPE **mp, int size){
   int i,j,k;
 
   srand(time(NULL));
+
+  m = (DATATYPE*)malloc(size*size*sizeof(DATATYPE));
+  if ( m == NULL)
+    return RET_FAILURE;
 
   l = (DATATYPE*)malloc(size*size*sizeof(DATATYPE));
   if ( l == NULL)
@@ -242,9 +292,8 @@ print_matrix(DATATYPE *m, int matrix_dim) {
 
 
 // Generate well-conditioned matrix internally  by Ke Wang 2013/08/07 22:20:06
-
 func_ret_t
-create_matrix(DATATYPE **mp, int size){
+create_well_conditionned_matrix(DATATYPE **mp, int size){
   DATATYPE *m;
   int i,j;
   DATATYPE lamda = -0.001;
