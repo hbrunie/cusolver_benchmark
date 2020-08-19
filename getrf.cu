@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include <cusolverDn.h>
 
+#include "helper_cuda.h"
 #include "common.h"
 
 void check_pivot(bool pivot_on){
@@ -46,8 +47,8 @@ int main(int argc, char*argv[])
     double *A,*B;
     int matrix_dim = 0;
     int rhs_matrix_dim = 0;
-    const char *rhs_input_file = NULL;
     const char *input_file = NULL;
+    const char *rhs_input_file = NULL;
     handle_arguments(argc, argv, &matrix_dim, input_file, &rhs_matrix_dim, rhs_input_file);
     //Creating matrix A
     func_ret_t ret;
@@ -104,6 +105,7 @@ int main(int argc, char*argv[])
     int Ipiv[matrix_dim];      /* host copy of pivoting sequence */
 
     const bool pivot_on = true;
+    float getrf_msecTotal = 0.0f, getrs_msecTotal = 0.0f;
     check_pivot(pivot_on);
 
 
@@ -160,6 +162,17 @@ int main(int argc, char*argv[])
         assert(cudaSuccess == cudaStat2);
     }
 
+    cublasHandle_t handle;
+    // Allocate CUDA events that we'll use for timing
+    cublasCreate(&handle);
+    cudaEvent_t start;
+    checkCudaErrors(cudaEventCreate(&start));
+    cudaEvent_t stop;
+    checkCudaErrors(cudaEventCreate(&stop));
+
+    cudaDeviceSynchronize();
+    // Record the start event
+    checkCudaErrors(cudaEventRecord(start, NULL));
     status = cusolverDnDgetrf(
             cusolverH,
             matrix_dim,
@@ -170,6 +183,12 @@ int main(int argc, char*argv[])
             d_Ipiv,
             d_info);
     cudaStat1 = cudaDeviceSynchronize();
+    // Record the stop event
+    checkCudaErrors(cudaEventRecord(stop, NULL));
+    // Wait for the stop event to complete
+    checkCudaErrors(cudaEventSynchronize(stop));
+    checkCudaErrors(cudaEventElapsedTime(&getrf_msecTotal, start, stop));
+
     assert(CUSOLVER_STATUS_SUCCESS == status);
     assert(cudaSuccess == cudaStat1);
 
@@ -198,6 +217,8 @@ int main(int argc, char*argv[])
     printMatrix(matrix_dim, matrix_dim, LU, lda, "LU");
     printf("=====\n");
 
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaEventRecord(start, NULL));
     status = cusolverDnDgetrs(
             cusolverH,
             CUBLAS_OP_N,
@@ -211,6 +232,9 @@ int main(int argc, char*argv[])
             d_info);
 
     cudaStat1 = cudaDeviceSynchronize();
+    checkCudaErrors(cudaEventRecord(stop, NULL));
+    checkCudaErrors(cudaEventSynchronize(stop));
+    checkCudaErrors(cudaEventElapsedTime(&getrs_msecTotal, start, stop));
     assert(CUSOLVER_STATUS_SUCCESS == status);
     assert(cudaSuccess == cudaStat1);
 
@@ -231,6 +255,7 @@ int main(int argc, char*argv[])
     if (cusolverH   ) cusolverDnDestroy(cusolverH);
     if (stream      ) cudaStreamDestroy(stream);
 
+    cublasDestroy(handle);
     cudaDeviceReset();
 
     return 0;
