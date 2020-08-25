@@ -87,6 +87,9 @@ void test_orthogonal_matrix(){
         cublasH, n*n, d_R, 1, &dR_nrm2);
     assert(CUBLAS_STATUS_SUCCESS == cublas_status);
 
-    printf("|I - Q**T*Q| = %E\n", dR_nrm2);
+    if(dR_nrm2 > 5e-15){
+        printf("ERROR: |I - Q**T*Q| = %E > 5e-15 \n", dR_nrm2);
+        exit(-1);
+    }
 
 }

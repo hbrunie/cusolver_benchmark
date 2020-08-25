@@ -39,7 +39,7 @@ void fill_random_matrix(double *A, int N){
     curandGenerator_t prng;
     curandCreateGenerator (&prng, CURAND_RNG_PSEUDO_DEFAULT);
     curandSetPseudoRandomGeneratorSeed(prng, (unsigned long long) clock());
-    curandGenerateUniformDouble(prng, A, N);
+    curandGenerateUniformDouble(prng, A, N*N);
 }
 
 void orthogonalize_matrix(DATATYPE * d_A, int n){
@@ -105,6 +105,22 @@ void orthogonalize_matrix(DATATYPE * d_A, int n){
     cudaStat1 = cudaDeviceSynchronize();
     assert(CUSOLVER_STATUS_SUCCESS == cusolver_status);
     assert(cudaSuccess == cudaStat1);
+    // step 5: compute Q
+    cusolver_status= cusolverDnDorgqr(
+        cusolverH,
+        n,
+        n,
+        n,
+        d_A,
+        n,
+        d_tau,
+        d_work,
+        lwork,
+        devInfo);
+    cudaStat1 = cudaDeviceSynchronize();
+    assert(CUSOLVER_STATUS_SUCCESS == cusolver_status);
+    assert(cudaSuccess == cudaStat1);
+
 }
 
 /* Matrix Q heap memory management must be handle outside the function.
