@@ -50,7 +50,7 @@ void test_orthogonal_matrix(){
 // step 6: measure R = I - Q**T*Q
     DATATYPE * h_R = (DATATYPE*) malloc(sizeof(DATATYPE)*n*n);
     DATATYPE * d_R;
-    cudaStat1 = cudaMalloc((void**)&(*d_R), sizeof(DATATYPE)*n*n);
+    cudaStat1 = cudaMalloc((void**)&(d_R), sizeof(DATATYPE)*n*n);
     assert(cudaSuccess == cudaStat1);
     memset(h_R, 0, sizeof(DATATYPE)*n*n);
     for(int j = 0 ; j < n ; j++)
