@@ -1,7 +1,10 @@
+#include <cassert>
 #include <cstdio>
 #include <curand.h>
 #include <cuda_runtime.h>
-#include <cassert>
+#include <cublas_v2.h>
+#include <cusolverDn.h>
+
 #include "utils.hpp"
 
 /* Generate positive eignenvalues, singular values are arithmetically distributed
@@ -40,6 +43,68 @@ void fill_random_matrix(double *A, int N){
 }
 
 void orthogonalize_matrix(DATATYPE * d_A, int n){
+    int lwork_geqrf = 0;
+    int lwork_orgqr = 0;
+    int lwork = 0;
+    cudaError_t cudaStat1 = cudaSuccess;
+    DATATYPE * d_tau, *d_work;
+    int * devInfo;
+
+    cublasHandle_t cublasH = NULL;
+    cusolverDnHandle_t cusolverH;
+    cusolverStatus_t cusolver_status = cusolverDnCreate(&cusolverH);
+    assert(CUSOLVER_STATUS_SUCCESS == cusolver_status);
+
+    cublasStatus_t cublas_status = cublasCreate(&cublasH);
+    assert(CUBLAS_STATUS_SUCCESS == cublas_status);
+
+    cudaStat1 = cudaMalloc ((void**)&d_tau, sizeof(double) * n);
+    assert(cudaSuccess == cudaStat1);
+
+    // step 3: query working space of geqrf and orgqr
+    cusolver_status = cusolverDnDgeqrf_bufferSize(
+        cusolverH,
+        n,
+        n,
+        d_A,
+        n,
+        &lwork_geqrf);
+
+    assert (cusolver_status == CUSOLVER_STATUS_SUCCESS);
+    cusolver_status = cusolverDnDorgqr_bufferSize(
+        cusolverH,
+        n,
+        n,
+        n,
+        d_A,
+        n,
+        d_tau,
+        &lwork_orgqr);
+    assert (cusolver_status == CUSOLVER_STATUS_SUCCESS);
+    // lwork = max(lwork_geqrf, lwork_orgqr)
+    lwork = (lwork_geqrf > lwork_orgqr)? lwork_geqrf : lwork_orgqr;
+
+    cudaStat1 = cudaMalloc((void**)&devInfo, sizeof(DATATYPE)*lwork);
+    assert(cudaSuccess == cudaStat1);
+    cudaStat1 = cudaMalloc((void**)&d_work, sizeof(DATATYPE)*lwork);
+    assert(cudaSuccess == cudaStat1);
+    cudaStat1 = cudaMalloc ((void**)&devInfo, sizeof(int));
+    assert(cudaSuccess == cudaStat1);
+
+// step 4: compute QR factorization
+    cusolver_status = cusolverDnDgeqrf(
+        cusolverH,
+        n,
+        n,
+        d_A,
+        n,
+        d_tau,
+        d_work,
+        lwork,
+        devInfo);
+    cudaStat1 = cudaDeviceSynchronize();
+    assert(CUSOLVER_STATUS_SUCCESS == cusolver_status);
+    assert(cudaSuccess == cudaStat1);
 }
 
 /* Matrix Q heap memory management must be handle outside the function.

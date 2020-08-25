@@ -9,7 +9,7 @@ CXX=nvcc -g
 	$(CXX) -c $< -I.
 
 tests: main.o test_driven.o utils.o
-	$(CXX) -o $@ $^ -lcurand -lcublas
+	$(CXX) -o $@ $^ -lcurand -lcublas -lcusolver
 
 
 getrf: getrf.cu common.c
