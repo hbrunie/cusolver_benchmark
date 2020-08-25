@@ -39,13 +39,19 @@ void fill_random_matrix(double *A, int N){
     curandGenerateUniformDouble(prng, A, N);
 }
 
+void orthogonalize_matrix(DATATYPE * d_A, int n){
+}
+
 /* Matrix Q heap memory management must be handle outside the function.
  * Q is a square matrix of size n by n.
  */
-void generate_orthogonal_matrix(DATATYPE * d_Q, int n){
+void generate_orthogonal_matrix(DATATYPE ** d_Q, int n, DATATYPE cond){
+    cudaError_t cudaStat1 = cudaSuccess;
+    cudaStat1 = cudaMalloc((void**)&(*d_Q), sizeof(DATATYPE)*n*n);
+    assert(cudaSuccess == cudaStat1);
     // Reset to 0 values inside Q
-    fill_random_matrix(d_Q,n);
-    //orthogonalize_matrix(d_Q,n);
+    fill_random_matrix(*d_Q,n);
+    orthogonalize_matrix(*d_Q,n);
 }
 
 void ConstantInitDouble(double *data, int size, double val) {
