@@ -31,7 +31,7 @@ void test_diagonal_matrix(){
             }
         }
     }
-    free(d_D);
+    free(h_D);
     cudaFree(d_D);
 }
 
