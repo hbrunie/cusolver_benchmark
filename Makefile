@@ -1,4 +1,16 @@
-all: getrf
+all: tests
+
+CXX=nvcc
+
+%.o: %.cu
+	$(CXX) -c $< -I.
+
+%.o: %.cpp
+	$(CXX) -c $< -I.
+
+tests: main.o test_driven.o utils.o
+	$(CXX) -o $@ $^ -lcurand
+
 
 getrf: getrf.cu common.c
 	nvcc -c $^ -std=c++14 -I. -g -lineno -I Common/
