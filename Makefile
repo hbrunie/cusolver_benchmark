@@ -1,6 +1,6 @@
 all: tests
 
-CXX=nvcc
+CXX=nvcc -g
 
 %.o: %.cu
 	$(CXX) -c $< -I.

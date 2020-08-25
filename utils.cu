@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <curand.h>
 #include <cuda_runtime.h>
 #include <cassert>
@@ -15,14 +16,18 @@ __global__
 void
 fill_diagonal_matrix(DATATYPE * d_D, int n, DATATYPE cond){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    d_D[n*idx+idx] = SIGMA_I(n*idx+idx,n);
+    if(idx%(n+1) == 0)
+        d_D[idx] = SIGMA_I(idx%n,n,cond);
+    else
+        d_D[idx] = 0;
 }
+
 void generate_diagonal_matrix(DATATYPE ** d_D, int n, DATATYPE cond){
     cudaError_t cudaStat1 = cudaSuccess;
     cudaStat1 = cudaMalloc((void**)&(*d_D), sizeof(DATATYPE)*n*n);
     assert(cudaSuccess == cudaStat1);
     // Fill D with diagonal values
-    fill_diagonal_matrix<<<n*n,1>>>(*d_D, n, cond);
+    fill_diagonal_matrix<<<1,n*n>>>(*d_D, n, cond);
 }
 
 

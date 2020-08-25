@@ -2,6 +2,8 @@
 #include <cuda_runtime.h>
 
 #include "utils.hpp"
+#include <iostream>
+using namespace std;
 
 void test_diagonal_matrix(){
     double * d_D;
@@ -15,8 +17,10 @@ void test_diagonal_matrix(){
     cudaStat1 = cudaMemcpy(h_D, d_D, sizeof(DATATYPE)*n*n, cudaMemcpyDeviceToHost);
     for(int i=0; i<n; i++){
         for(int j=0; j<n; j++){
-            if((i==j && h_D[i*n+j] != SIGMA_I(i,n))
-            || (i!=j && h_D[i*n+j] != 0.)){
+            double tmp = SIGMA_I(i,n,cond);
+            double current = h_D[i*n+j];
+            if((i==j && current!=tmp)
+            || (i!=j && current!= 0.)){
                 exit(-1);
             }
         }
