@@ -41,13 +41,15 @@ void test_orthogonal_matrix(){
     double * h_Q = (double*) malloc(sizeof(double) * n*n);
     double cond = 1000.;
     cudaError_t cudaStat1 = cudaSuccess;
-    //tested code
-    generate_orthogonal_matrix(&d_Q, n,cond);
+    /* Tested code */
+    generate_orthogonal_matrix(&d_Q, n);
 
+    /* Testing code */
     cudaStat1 = cudaMemcpy(h_Q, d_Q, sizeof(DATATYPE)*n*n, cudaMemcpyDeviceToHost);
     assert(cudaSuccess == cudaStat1);
 
-// step 6: measure R = I - Q**T*Q
+    // measure R = I - Q**T*Q
+    // First Step: build R <-- I
     DATATYPE * h_R = (DATATYPE*) malloc(sizeof(DATATYPE)*n*n);
     DATATYPE * d_R;
     cudaStat1 = cudaMalloc((void**)&(d_R), sizeof(DATATYPE)*n*n);
@@ -59,7 +61,7 @@ void test_orthogonal_matrix(){
     cudaStat1 = cudaMemcpy(d_R, h_R, sizeof(DATATYPE)*n*n, cudaMemcpyHostToDevice);
     assert(cudaSuccess == cudaStat1);
 
-    // R = -Q**T*Q + I
+    // Second step R = R - Q**T*Q
     cublasHandle_t cublasH;
     cublasStatus_t cublas_status = cublasCreate(&cublasH);
     const DATATYPE h_minus_one = -1.;
@@ -92,4 +94,20 @@ void test_orthogonal_matrix(){
         exit(-1);
     }
 
+}
+
+void test_svd_distribution_matrix(){
+    // Diagonalize the matrix and found the value inserted during matrix generation
+    int n = 10;
+    DATATYPE cond = 1e3;
+    DATATYPE * d_D;//2D matrix
+    DATATYPE * h_D;// not matrix, just 1D array with diagonal element
+    h_D = (DATATYPE*) malloc(sizeof(DATATYPE)*n);
+    generate_diagonal_matrix(&d_D, n, cond);
+    //get_diagonal_from(h_D, d_D, n);
+    for(int i=0; i<n; i++){
+        double tmp = SIGMA_I(i,n,cond);
+        if(fabs(h_D[i] - tmp)>1e-14)
+            exit(-1);
+    }
 }

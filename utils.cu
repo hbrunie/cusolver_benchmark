@@ -126,11 +126,10 @@ void orthogonalize_matrix(DATATYPE * d_A, int n){
 /* Matrix Q heap memory management must be handle outside the function.
  * Q is a square matrix of size n by n.
  */
-void generate_orthogonal_matrix(DATATYPE ** d_Q, int n, DATATYPE cond){
+void generate_orthogonal_matrix(DATATYPE ** d_Q, int n){
     cudaError_t cudaStat1 = cudaSuccess;
     cudaStat1 = cudaMalloc((void**)&(*d_Q), sizeof(DATATYPE)*n*n);
     assert(cudaSuccess == cudaStat1);
-    // Reset to 0 values inside Q
     fill_random_matrix(*d_Q,n);
     orthogonalize_matrix(*d_Q,n);
 }
@@ -139,4 +138,47 @@ void ConstantInitDouble(double *data, int size, double val) {
     for (int i = 0; i < size; ++i) {
         data[i] = val+i;
     }
+}
+
+void generate_svd_distribution_matrix(DATATYPE ** d_A, int n, DATATYPE cond){
+    DATATYPE * d_Q;
+    generate_orthogonal_matrix(&d_Q, n);
+    generate_diagonal_matrix(d_A, n, cond);
+
+    const DATATYPE h_zero = 0.;
+    const DATATYPE h_one = 1.;
+    cublasHandle_t cublasH;
+    cublasStatus_t cublas_status = cublasCreate(&cublasH);
+    cublas_status = cublasDgemm_v2(
+        cublasH,
+        CUBLAS_OP_N, // D
+        CUBLAS_OP_T, // Q**T
+        n, // number of rows of D
+        n, // number of columns of D
+        n, // number of columns of Q**T
+        &h_one, /* host pointer */
+        *d_A, // D
+        n,
+        d_Q, // Q**T
+        n,
+        &h_zero, /* hostpointer */
+        *d_A,
+        n);
+    assert(CUBLAS_STATUS_SUCCESS == cublas_status);
+    cublas_status = cublasDgemm_v2(
+        cublasH,
+        CUBLAS_OP_N, // Q
+        CUBLAS_OP_N, // D
+        n, // number of rows of Q
+        n, // number of columns of Q
+        n, // number of columns of D
+        &h_one, /* host pointer */
+        d_Q, // Q
+        n,
+        *d_A, // D
+        n,
+        &h_zero, /* hostpointer */
+        *d_A,
+        n);
+    assert(CUBLAS_STATUS_SUCCESS == cublas_status);
 }
